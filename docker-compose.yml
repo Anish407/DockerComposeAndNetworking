@@ -1,0 +1,77 @@
+﻿version: 3.x
+
+services:
+  api1:
+    build: 
+     context: .
+     dockerfile: Api1.Dockerfile
+    ports:
+      - "8081:5002"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - public_network
+    depends_on:
+      - api2
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50" # 50% of a single CPU core
+          memory: "512M" # 512 MB of RAM
+  api2:
+    build:
+      context: .
+      dockerfile: API2.Dockerfile
+    ports:
+      - "8082:5179"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - private_network
+      - public_network
+    depends_on:
+      - sql_server
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50" # 50% of a single CPU core
+          memory: "512M" # 512 MB of RAM
+  
+  sql_server:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    ports:
+      - "1434:1433"
+    environment:
+        SA_PASSWORD: "anish123@Passw0rd"
+        ACCEPT_EULA: "Y"
+    networks:
+        - private_network
+    volumes:
+      - ./init.sql:/init.sql  # Mounts the init.sql script into the container
+  
+  db_init:
+    image: mcr.microsoft.com/mssql-tools
+    container_name: db_init
+    depends_on:
+      - sql_server
+    entrypoint: /bin/bash
+    command: -c "
+      echo 'Waiting for SQL Server to start...';
+      sleep 30;
+      echo 'Running initialization script...';
+      /opt/mssql-tools/bin/sqlcmd -S sql_server -U sa -P 'YourStrong@Passw0rd' -i /init.sql;
+      echo 'Initialization complete.';
+      "
+    networks:
+      - private_network
+    volumes:
+      - ./init.sql:/init.sql  # Mounts the init.sql script into the container
+  
+networks:
+  public_network:
+    driver: bridge
+  private_network:
+     driver: bridge
+      
+    
+      
